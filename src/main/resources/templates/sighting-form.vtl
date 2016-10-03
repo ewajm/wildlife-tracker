@@ -10,8 +10,27 @@
     </select>
   </div>
   <div class="form-group">
-    <label for="animal-names">Animal Names (separate by commas)</label>
-    <input type="text" name="animal-names" class="form-control" required>
+    <label for="animals">Animals Seen:  </label>
+    #if($endangereds.size() > 0 || $animals.size() > 0)
+      #if($endangereds.size()> 0)
+        <em>Endangered: </em>
+        #foreach($endangered in $endangereds)
+        <label class="checkbox-inline">
+          <input type="checkbox" name="endangered-seen" value="$endangered.getId()">$endangered.getName() the $endangered.getSpecies()
+        </label>
+        #end
+      #end
+      #if($animals.size() > 0)
+        <em>Common: </em>
+        #foreach($animal in $animals)
+        <label class="checkbox-inline">
+          <input type="checkbox" name="common-seen" value="$animal.getId()">$animal.getName() the $animal.getSpecies()
+        </label>
+        #end
+      #end
+    #else
+      Please add animals to the database before recording your sighting
+    #end
   </div>
   <button type="submit" name="button" class="btn btn-primary">Add Sighting</button>
 </form>

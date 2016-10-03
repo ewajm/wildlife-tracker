@@ -3,30 +3,27 @@ import java.util.Map;
 import spark.ModelAndView;
 import spark.template.velocity.VelocityTemplateEngine;
 import static spark.Spark.*;
+import spark.Request;
 
 public class App {
+  private static final String FLASH_MESSAGE_KEY = "flash_message";
+
   public static void main(String[] args) {
     staticFileLocation("/public");
     String layout = "templates/layout.vtl";
 
     //before filters
-    before("/sightings/*", (request, response) -> {
-      String rangerName= request.session().attribute("rangerName");
-      if(rangerName==null){
-        response.redirect("/");
-        halt();
+    before("/*/*", (request, response) -> {
+      if(!request.pathInfo().equals("/")){
+        String rangerName= request.session().attribute("rangerName");
+        if(rangerName==null){
+          response.redirect("/");
+          halt();
+        }
       }
     });
 
     before("/sightings", (request, response) -> {
-      String rangerName= request.session().attribute("rangerName");
-      if(rangerName==null){
-        response.redirect("/");
-        halt();
-      }
-    });
-
-    before("/animals/*", (request, response) -> {
       String rangerName= request.session().attribute("rangerName");
       if(rangerName==null){
         response.redirect("/");
@@ -44,8 +41,7 @@ public class App {
 
     //Index page
     get("/", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("rangerName", request.session().attribute("rangerName"));
+      Map<String, Object> model = createPrelimModel(request);
       model.put("recentSightings", Sighting.mostRecent());
       model.put("template", "templates/index.vtl");
       return new ModelAndView(model, layout);
@@ -55,6 +51,7 @@ public class App {
     post("/", (request, response) -> {
       String rangerName = request.queryParams("rangerName");
       request.session().attribute("rangerName", rangerName);
+      setFlashMessage(request, "Thanks for logging in!");
       response.redirect("/");
       return null;
     });
@@ -62,14 +59,14 @@ public class App {
     //Log out
     get("/logout", (request, response) -> {
       request.session().removeAttribute("rangerName");
+      setFlashMessage(request, "Logged out");
       response.redirect("/");
       return null;
     });
 
     //Animal list
     get("/animals", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("rangerName", request.session().attribute("rangerName"));
+      Map<String, Object> model = createPrelimModel(request);
       model.put("regular_animals", RegularAnimal.all());
       model.put("endangered_animals", EndangeredAnimal.all());
       model.put("template", "templates/animals.vtl");
@@ -78,14 +75,13 @@ public class App {
 
     //New animal form
     get("/animals/new", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
+      Map<String, Object> model = createPrelimModel(request);;
       model.put("HEALTH_HEALTHY", EndangeredAnimal.HEALTH_HEALTHY);
       model.put("HEALTH_OK", EndangeredAnimal.HEALTH_OK);
       model.put("HEALTH_ILL", EndangeredAnimal.HEALTH_ILL);
       model.put("AGE_BABBY", EndangeredAnimal.AGE_BABBY);
       model.put("AGE_YOUNG", EndangeredAnimal.AGE_YOUNG);
       model.put("AGE_ADULT", EndangeredAnimal.AGE_ADULT);
-      model.put("rangerName", request.session().attribute("rangerName"));
       model.put("template", "templates/animal-form.vtl");
       return new ModelAndView(model, layout);
     }, new VelocityTemplateEngine());
@@ -104,24 +100,25 @@ public class App {
         RegularAnimal regularAnimal = new RegularAnimal(name, species);
         regularAnimal.save();
       }
+      setFlashMessage(request, name + " added!");
       response.redirect("/animals");
       return null;
     });
 
     //individual common(regular) animal pages
     get("/animals/endangered/:id", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
+      Map<String, Object> model = createPrelimModel(request);
       EndangeredAnimal animal = EndangeredAnimal.find(Integer.parseInt(request.params("id")));
       model.put("animal", animal);
-      model.put("rangerName", request.session().attribute("rangerName"));
       model.put("template", "templates/animal.vtl");
       return new ModelAndView(model, layout);
     }, new VelocityTemplateEngine());
 
     //delete endangered animal
     post("/animals/endangered/:id/delete", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
       EndangeredAnimal animal = EndangeredAnimal.find(Integer.parseInt(request.params("id")));
+      String message = animal.getName() + " deleted";
+      setFlashMessage(request, message);
       animal.delete();
       response.redirect("/animals");
       return null;
@@ -129,27 +126,26 @@ public class App {
 
     //individual common(regular) animal pages
     get("/animals/:id", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
+      Map<String, Object> model = createPrelimModel(request);
       RegularAnimal animal = RegularAnimal.find(Integer.parseInt(request.params("id")));
       model.put("animal", animal);
-      model.put("rangerName", request.session().attribute("rangerName"));
       model.put("template", "templates/animal.vtl");
       return new ModelAndView(model, layout);
     }, new VelocityTemplateEngine());
 
     //delete common animals
     post("/animals/:id/delete", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
       RegularAnimal animal = RegularAnimal.find(Integer.parseInt(request.params("id")));
       animal.delete();
+      String message = animal.getName() + " deleted";
+      setFlashMessage(request, message);
       response.redirect("/animals");
       return null;
     });
 
     //all sightings
     get("/sightings", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("rangerName", request.session().attribute("rangerName"));
+      Map<String, Object> model = createPrelimModel(request);
       model.put("sightings", Sighting.allByDate());
       model.put("template", "templates/sightings.vtl");
       return new ModelAndView(model, layout);
@@ -157,8 +153,9 @@ public class App {
 
     //new sighting form
     get("/sightings/new", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("rangerName", request.session().attribute("rangerName"));
+      Map<String, Object> model = createPrelimModel(request);
+      model.put("animals", RegularAnimal.all());
+      model.put("endangereds", EndangeredAnimal.all());
       model.put("template", "templates/sighting-form.vtl");
       return new ModelAndView(model, layout);
     }, new VelocityTemplateEngine());
@@ -169,26 +166,31 @@ public class App {
       String location = request.queryParams("location");
       Sighting sighting = new Sighting(location, rangerName);
       sighting.save();
-      String[] animalArray = request.queryParams("animal-names").split(",");
+      String[] animalArray = request.queryParamsValues("common-seen");
+      String[] endangeredArray = request.queryParamsValues("endangered-seen");
       Animal animal;
-      for(String animalName : animalArray){
-        animal = RegularAnimal.findByName(animalName);
-        if(animal == null){
-          animal = EndangeredAnimal.findByName(animalName);
-        }
-        if(animal != null){
+      System.out.print(animalArray);
+      System.out.print(endangeredArray);
+      if(animalArray != null){
+        for(String animalString : animalArray){
+          animal = RegularAnimal.find(Integer.parseInt(animalString));
           sighting.addAnimal(animal);
-        } else {
-          throw new NullPointerException("I'm sorry, We couldn't find one of your animals. Please add it to the database and update your sighting");
         }
       }
+      if(endangeredArray != null){
+        for(String endangeredString : endangeredArray){
+          animal = EndangeredAnimal.find(Integer.parseInt(endangeredString));
+          sighting.addAnimal(animal);
+        }
+      }
+      setFlashMessage(request, "Sighting added.");
       response.redirect("/sightings");
       return null;
     });
 
     //individual common(regular) animal pages
     get("/sightings/:id", (request, response) -> {
-      Map<String, Object> model = new HashMap<String, Object>();
+      Map<String, Object> model  = createPrelimModel(request);
       Sighting sighting = Sighting.find(Integer.parseInt(request.params("id")));
       model.put("sighting", sighting);
       model.put("rangerName", request.session().attribute("rangerName"));
@@ -201,6 +203,7 @@ public class App {
       Map<String, Object> model = new HashMap<String, Object>();
       Sighting sighting = Sighting.find(Integer.parseInt(request.params("id")));
       sighting.delete();
+      setFlashMessage(request, "Sighting deleted");
       response.redirect("/sightings");
       return null;
     });
@@ -209,9 +212,8 @@ public class App {
     exception(NullPointerException.class, (exc, request, response) -> {
       response.status(500);
       VelocityTemplateEngine engine = new VelocityTemplateEngine();
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("rangerName", request.session().attribute("rangerName"));
-      model.put("message", exc.getMessage());
+      Map<String, Object> model = createPrelimModel(request);
+      model.put("error", exc.getMessage());
       model.put("template", "templates/notfound.vtl");
       String html = engine.render(new ModelAndView(model, layout));
       response.body(html);
@@ -220,22 +222,53 @@ public class App {
     exception(IndexOutOfBoundsException.class, (exc, request, response) -> {
       response.status(404);
       VelocityTemplateEngine engine = new VelocityTemplateEngine();
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("rangerName", request.session().attribute("rangerName"));
-      model.put("message", exc.getMessage());
+      Map<String, Object> model = createPrelimModel(request);
+      model.put("error", exc.getMessage());
       model.put("template", "templates/notfound.vtl");
       String html = engine.render(new ModelAndView(model, layout));
       response.body(html);
     });
 
-    exception(NumberFormatException.class, (exc, req, res) -> {
-      res.status(404);
+    exception(NumberFormatException.class, (exc, request, response) -> {
+      response.status(404);
       VelocityTemplateEngine engine = new VelocityTemplateEngine();
-      Map<String, Object> model = new HashMap<String, Object>();
-      model.put("message", "looks like that page doesn't exist!");
+      Map<String, Object> model = createPrelimModel(request);
+      model.put("error", exc.getMessage());
       model.put("template", "templates/notfound.vtl");
       String html = engine.render(new ModelAndView(model, layout));
-      res.body(html);
+      response.body(html);
     });
   }
+  //flash message
+  private static void setFlashMessage(Request request, String message){
+    request.session().attribute(FLASH_MESSAGE_KEY, message);
+  }
+
+  private static String getFlashMessage(Request request){
+    if(request.session(false) == null){
+      return null;
+    }
+    if(!request.session().attributes().contains(FLASH_MESSAGE_KEY)){
+      return null;
+    }
+    return (String) request.session().attribute(FLASH_MESSAGE_KEY);
+  }
+
+  private static String captureFlashMessage(Request request){
+    String message = getFlashMessage(request);
+    if(message != null){
+      request.session().removeAttribute(FLASH_MESSAGE_KEY);
+    }
+    return message;
+  }
+
+  private static Map<String, Object> createPrelimModel(Request request){
+    Map<String, Object> model = new HashMap<String, Object>();
+    if(request.session(false) != null){
+      model.put("rangerName", request.session().attribute("rangerName"));
+      model.put("message", captureFlashMessage(request));
+    }
+    return model;
+  }
+
 }

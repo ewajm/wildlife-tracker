@@ -64,6 +64,18 @@ form {
   color: #2b2118;
 }
 
+.message-display {
+  width: 80%;
+  background-color: #b3b6b7;
+  border: 1px solid #6f1a07;
+  border-radius: 5px;
+  margin: 1rem auto;
+}
+
+.message-display h4{
+  color: #6f1a07;
+}
+
 form.manage {
   background-color: transparent;
   margin: 1rem auto;
@@ -163,5 +175,9 @@ input[type="checkbox"]:checked ~ .reveal-if-active {
 
   form {
     width: 60%;
+  }
+
+  .message-display {
+    width: 50%;
   }
 }
